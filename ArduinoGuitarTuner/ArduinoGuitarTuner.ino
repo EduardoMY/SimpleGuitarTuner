@@ -2,13 +2,14 @@
  
 // 
 Servo servo;
+
 //pines
-short pinServo=25;
+short pinServo=37;
 short FREQREADER=4;
-short PBON=26, PBOFF=27, PBSTRING=53, PBSTART=29; // Declaracion de los readers de los botones PBON, PBOFF, PBSTRING, PBSTART, FREQ
-short LEDDONE=30, LEDON=31; // Declaracion de los outputs de los leds que vamos a encender LEDDONE, LEDON
-short LEDS[6]={32, 33, 34, 35, 36, 37};//E, A, D, G, B,  E
-//short anterior,actual;
+short PBON=52, PBOFF=50, PBSTRING=53, PBSTART=51; // Declaracion de los readers de los botones PBON, PBOFF, PBSTRING, PBSTART, FREQ
+short LEDDONE=42, LEDON=43; // Declaracion de los outputs de los leds que vamos a encender LEDDONE, LEDON
+short LEDS[6]={48, 44, 46, 49, 47, 45};//E, A, D, G, B,  E
+unsigned long timer, upperTime;
 
 // constantes, diferenciales, etc;
 double FREQ;
@@ -29,10 +30,10 @@ void setup() {
   pinMode(FREQREADER, INPUT);
   
   //Declaracion de los Botones
-  pinMode(PBON, INPUT);
-  pinMode(PBOFF, INPUT);
+  pinMode(PBON, INPUT_PULLUP);
+  pinMode(PBOFF, INPUT_PULLUP);
   pinMode(PBSTRING, INPUT_PULLUP);
-  pinMode(PBSTART, INPUT);
+  pinMode(PBSTART, INPUT_PULLUP);
   
     //Declaracion de los LEds
   pinMode(LEDS[0], OUTPUT);
@@ -43,50 +44,74 @@ void setup() {
   pinMode(LEDS[5], OUTPUT);
   
   pinMode(LEDON, OUTPUT);
+  digitalWrite(LEDON, HIGH);
+  
   isTunning=false;
   isBtnUp=true;//el medina no sabe como programar;
   currentNote=0;
-  digitalWrite(LEDON, HIGH);
+  timer=0;
+  upperTime=10;
 }
-void resetAll(void){
+
+void resetAll(){
   isTunning=false;
   digitalWrite(LEDS[currentNote-1], LOW);
   currentNote=0;
   digitalWrite(LEDON, LOW);
-}
-void loop() {
+} 
+
+void loop(void) {
   //
   if(!isTunning){
     if(digitalRead(PBSTRING)==LOW){
-      if(isBtnUp)
+      if(isBtnUp && timer==0){
         turnOnLed();
+        timer=1; 
+        Serial.print("Numero");
+        Serial.println(timer);
+      }
       isBtnUp=false;
     }
-    else
+     else if(digitalRead(PBOFF)==LOW){
+      if(isBtnUp && timer==0){
+        resetAll();
+        timer=1;
+      }
+      isBtnUp=false;
+     }
+     else if(digitalRead(PBSTART)==LOW){
+      if(isBtnUp && timer==0){
+        isTunning=true;
+        timer=1;
+      }
+      isBtnUp=false;
+     }
+     else
       isBtnUp=true;
-     /*else if(digitalRead(PBOFF)==LOW)
-      resetAll();
-     else if(digitalRead(PBSTART)==LOW)
-     isTunning=true;*/
   }
   else {
     duration = pulseIn(FREQREADER, HIGH);
     if(duration!=0)
       FREQ= 500000/duration;
     else FREQ=0;
-    checkFreq();
+    //checkFreq();
     //moveServo();
     Serial.print("Frecuencia.  ");
     Serial.println(FREQ); 
   }
+  if(timer!=0)
+     timer++;
+  if(timer==upperTime)
+    timer=0;
+  Serial.println(timer);
 }
+/*
 void checkFreq(void){
   for(int c=0; c<6; c++)
-    if(noteFrequencies[c]-df <= FREQ && noteFrequencies[c]+df >= FREQ){
-    Serial.print(c);
-       digitalWrite(LEDS[c], HIGH);
-  }
-}
+    if(noteFrequencies[c]-df <= FREQ && noteFrequencies[c]+df >= FREQ)
+      Serial.print(c);
+} */
+
 void turnOnLed(void){
   Serial.print("Nota actual: ");
   Serial.println(currentNote);
@@ -97,15 +122,17 @@ void turnOnLed(void){
     currentNote=1;
    digitalWrite(LEDS[currentNote-1], HIGH);
 }
+
 void stringDone(void){
   digitalWrite(LEDDONE, HIGH);
   delay(1000);
   digitalWrite(LEDDONE, LOW);
   isTunning=false;
 }
+
 void moveServo(void){
     Serial.println("Servo se va a mover");
-    if(noteFrequencies[currentNote-1]-df < FREQ-df){ //Mover clockWise
+    if(noteFrequencies[currentNote-1]-df < FREQ-df){ //Mover clockWise  
       servo.write(90+servoMovement);// sets the servo position according to the scaled value
       delay(15); // waits for the servo to get there
     }
@@ -115,4 +142,4 @@ void moveServo(void){
     }
     else
       stringDone();
-  }
+}
