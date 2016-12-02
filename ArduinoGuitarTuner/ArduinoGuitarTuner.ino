@@ -5,10 +5,10 @@
 Servo servo;
 
 //pines
-short pinServo=37;
-short PBON=52, PBOFF=50, PBSTRING=53, PBSTART=51; // Declaracion de los readers de los botones PBON, PBOFF, PBSTRING, PBSTART, FREQ
-short LEDDONE=42, LEDON=43; // Declaracion de los outputs de los leds que vamos a encender LEDDONE, LEDON
-short LEDS[6]={48, 44, 46, 49, 47, 45};//E, A, D, G, B,  E
+short pinServo=40;
+short PBON=51, PBOFF=50, PBSTRING=52, PBSTART=53; // Declaracion de los readers de los botones PBON, PBOFF, PBSTRING, PBSTART, FREQ
+short LEDDONE=23, LEDON=22; // Declaracion de los outputs de los leds que vamos a encender LEDDONE, LEDON
+short LEDS[6]={35, 34, 33, 32, 31, 30};//E, A, D, G, B,  E
 unsigned long timerPB, upperTime;
 
 // constantes, diferenciales, etc;
@@ -56,7 +56,7 @@ boolean isSystemOn;
 
 void setup() {
   Serial.begin(9600);
-  servo.attach(pinServo); //Declaracion del Servo
+  //servo.attach(pinServo); //Declaracion del Servo
   
     //Declaracion de los Botones
   pinMode(PBON, INPUT_PULLUP);
@@ -229,8 +229,13 @@ void loop(){
         frequency = 38462/float(period);//calculate frequency timer rate/period
       Serial.print("Frecuencia: ");
       Serial.println(frequency);
-      moveServo();
+      if(frequency!=0)
+        moveServo();
+      else
+        stopServo();
     }
+    else 
+      Serial.println("Ni leeyo");
     if(digitalRead(PBOFF)==LOW){
       if(timerPB==0){
         resetAll();
@@ -266,18 +271,19 @@ void stringDone(void){
 }
 
 void moveServo(void){
+  servo.attach(pinServo);
     Serial.println("Servo se va a mover");
-    servo.write(90+servoMovement);
-    /*
-    if(noteFrequencies[currentNote-1]-df < FREQ-df){ //Mover clockWise  
+    
+    if(noteFrequencies[currentNote-1]-df > frequency) //Mover clockWise  
       servo.write(90+servoMovement);// sets the servo position according to the scaled value
-      delay(15); // waits for the servo to get there
-    }
-    else if(noteFrequencies[currentNote-1] > FREQ+df) {
+    
+    else if(noteFrequencies[currentNote-1]+df < frequency) 
       servo.write(90-servoMovement);// sets the servo position according to the scaled value
-      delay(15); // waits for the servo to get there
-    }
+    
     else
       stringDone();
-      */
+      
+}
+void stopServo(void){
+  servo.detach();
 }
