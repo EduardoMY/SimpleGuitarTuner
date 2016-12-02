@@ -14,7 +14,7 @@ unsigned long timerPB, upperTime;
 // constantes, diferenciales, etc;
 float noteFrequencies[6]={82.4, 110, 146.8, 196, 246.9, 329.6}; //unidad en Hz
 short servoMovement=10; // que tanto se movera el servo
-float df=10; //margen de las frecuencias
+float df=3; //margen de las frecuencias
 
 /*
  * Empiezan variables para identificar la frecuencia
@@ -52,6 +52,7 @@ byte ampThreshold = 30;//raise if you have a very noisy signal
 short currentNote; //E=1, A=2,..E=6
 boolean isTunning; 
 boolean isBtnUp;
+boolean isSystemOn;
 
 void setup() {
   Serial.begin(9600);
@@ -72,16 +73,15 @@ void setup() {
   pinMode(LEDS[5], OUTPUT);
   
   pinMode(LEDON, OUTPUT);
-  digitalWrite(LEDON, HIGH);
 
-  isTunning=true;
-  isBtnUp=true;//el medina no sabe como programar;
+  isTunning=false;
+  isSystemOn=false;
+  isBtnUp=true;//el medina sabe como programar;
   currentNote=0;
   timerPB=0;
-  upperTime=10;
+  upperTime=100;
   frequency=0;
-  //servo.write(90);
-  //servo.writeMicroseconds(50);
+
   cli();//disable interrupts
   
   //set up continuous sampling of analog pin 0 at 38.5kHz
@@ -164,7 +164,6 @@ ISR(ADC_vect) {//when new ADC value ready
     checkMaxAmp = maxAmp;
     maxAmp = 0;
   }
-  
 }
 
 void reset(){//clean out some variables
@@ -177,53 +176,75 @@ void resetAll(){
   isTunning=false;
   digitalWrite(LEDS[currentNote-1], LOW);
   currentNote=0;
+  isSystemOn=false;
   digitalWrite(LEDON, LOW);
+  Serial.println("Se debio de apagar");
 } 
 
 void loop(){
   //
   if(!isTunning){
-    if(digitalRead(PBSTRING)==LOW){
+    if(digitalRead(PBSTRING)==LOW && isSystemOn){
       if(isBtnUp && timerPB==0){
         turnOnLed();
         timerPB=1; 
-        //Serial.print("Numero");
-        //Serial.println(timerPB);
       }
       isBtnUp=false;
     }
-     else if(digitalRead(PBOFF)==LOW){
+     else if(digitalRead(PBOFF)==LOW && isSystemOn){
       if(isBtnUp && timerPB==0){
         resetAll();
         timerPB=1;
       }
       isBtnUp=false;
      }
-     else if(digitalRead(PBSTART)==LOW){
+     else if(digitalRead(PBSTART)==LOW && isSystemOn && currentNote!=0){
       if(isBtnUp && timerPB==0){
         isTunning=true;
         timerPB=1;
+        Serial.print("Nota Actual: ");
+        Serial.println(currentNote);
       }
       isBtnUp=false;
      }
-     else
+    else if(digitalRead(PBON)==LOW){
+      if(isBtnUp && timerPB==0){
+        digitalWrite(LEDON, HIGH);
+        isSystemOn=true;
+        timerPB=1;
+        Serial.print("Hola Elsa: ");
+        Serial.println(timerPB);
+      }
+      isBtnUp=false;
+     }
+     else 
       isBtnUp=true;
   }
-  else { 
+  else if(isSystemOn){ 
+
     if (checkMaxAmp>ampThreshold){
-      frequency = 38462/float(period);//calculate frequen      servo.detach();cy timer rate/period
+      if(period==0)
+        frequency=0.0;
+      else
+        frequency = 38462/float(period);//calculate frequency timer rate/period
       Serial.print("Frecuencia: ");
       Serial.println(frequency);
       moveServo();
     }
-    if(digitalRead(PBSTRING)==LOW)
-          servo.detach();
+    if(digitalRead(PBOFF)==LOW){
+      if(timerPB==0){
+        resetAll();
+        timerPB=1;
+      }
+    }
+    
   }
+  
   if(timerPB!=0)
      timerPB++;
   if(timerPB==upperTime)
     timerPB=0;
-  //Serial.println(timer);
+  Serial.println(timerPB);
 }
 
 void turnOnLed(void){
