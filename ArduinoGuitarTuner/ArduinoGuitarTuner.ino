@@ -1,5 +1,4 @@
 #include <Servo.h>
-//#include <AudioFrequencyMeter.h>
  
 // 
 Servo servo;
@@ -9,11 +8,14 @@ short pinServo=40;
 short PBON=51, PBOFF=50, PBSTRING=52, PBSTART=53; // Declaracion de los readers de los botones PBON, PBOFF, PBSTRING, PBSTART, FREQ
 short LEDDONE=23, LEDON=22; // Declaracion de los outputs de los leds que vamos a encender LEDDONE, LEDON
 short LEDS[6]={35, 34, 33, 32, 31, 30};//E, A, D, G, B,  E
+
+//Timer for the push buttons
 unsigned long timerPB, upperTime;
+//unsigned long timerServo, timerServoLimit;
 
 // constantes, diferenciales, etc;
 float noteFrequencies[6]={82.4, 110, 146.8, 196, 246.9, 329.6}; //unidad en Hz
-short servoMovement=10; // que tanto se movera el servo
+short servoMovement=-15; // que tanto se movera el servo
 float df=3; //margen de las frecuencias
 
 /*
@@ -53,6 +55,7 @@ short currentNote; //E=1, A=2,..E=6
 boolean isTunning; 
 boolean isBtnUp;
 boolean isSystemOn;
+boolean isServoOn;
 
 void setup() {
   Serial.begin(9600);
@@ -73,15 +76,20 @@ void setup() {
   pinMode(LEDS[5], OUTPUT);
   
   pinMode(LEDON, OUTPUT);
-
+  pinMode(LEDDONE, OUTPUT);
+  
   isTunning=false;
   isSystemOn=false;
   isBtnUp=true;//el medina sabe como programar;
+  isServoOn=false;
   currentNote=0;
   timerPB=0;
   upperTime=100;
   frequency=0;
-
+  
+  /*
+   * BEGIN OF CAT
+   */
   cli();//disable interrupts
   
   //set up continuous sampling of analog pin 0 at 38.5kHz
@@ -172,19 +180,26 @@ void reset(){//clean out some variables
   maxSlope = 0;//reset slope
 }
 
+/*
+ * END OF CAT
+ */
+ 
 void resetAll(){
   isTunning=false;
   digitalWrite(LEDS[currentNote-1], LOW);
   currentNote=0;
   isSystemOn=false;
   digitalWrite(LEDON, LOW);
+  digitalWrite(LEDDONE, LOW);
+  if(isServoOn)
+    stopServo();
   Serial.println("Se debio de apagar");
 } 
 
 void loop(){
   //
-  if(!isTunning){
-    if(digitalRead(PBSTRING)==LOW && isSystemOn){
+  if(!isTunning){ //If it's not tunning
+    if(digitalRead(PBSTRING)==LOW && isSystemOn){ //
       if(isBtnUp && timerPB==0){
         turnOnLed();
         timerPB=1; 
@@ -222,20 +237,20 @@ void loop(){
   }
   else if(isSystemOn){ 
 
-    if (checkMaxAmp>ampThreshold){
+    if (checkMaxAmp>ampThreshold){ //Avoid noises
       if(period==0)
-        frequency=0.0;
+        frequency=0.0; //If period is zero, we dont want infinit values
       else
         frequency = 38462/float(period);//calculate frequency timer rate/period
       Serial.print("Frecuencia: ");
       Serial.println(frequency);
       if(frequency!=0)
         moveServo();
-      else
-        stopServo();
     }
-    else 
+    else {
       Serial.println("Ni leeyo");
+      stopServo();
+    }
     if(digitalRead(PBOFF)==LOW){
       if(timerPB==0){
         resetAll();
@@ -261,29 +276,32 @@ void turnOnLed(void){
    if(currentNote==7)
     currentNote=1;
    digitalWrite(LEDS[currentNote-1], HIGH);
+
+   digitalWrite(LEDDONE, LOW);//Turn off LEDDONE
 }
 
 void stringDone(void){
   digitalWrite(LEDDONE, HIGH);
-  delay(1000);
-  digitalWrite(LEDDONE, LOW);
   isTunning=false;
+  stopServo();
 }
 
 void moveServo(void){
+  isServoOn=true;
   servo.attach(pinServo);
-    Serial.println("Servo se va a mover");
-    
-    if(noteFrequencies[currentNote-1]-df > frequency) //Mover clockWise  
-      servo.write(90+servoMovement);// sets the servo position according to the scaled value
-    
-    else if(noteFrequencies[currentNote-1]+df < frequency) 
-      servo.write(90-servoMovement);// sets the servo position according to the scaled value
-    
-    else
-      stringDone();
-      
+  Serial.println("Servo se va a mover");
+  if(noteFrequencies[currentNote-1]-df > frequency) //Actual Frequency is  below a reasonable value, 
+    servo.write(90+servoMovement);// sets the servo position according to the scaled value
+  else if(noteFrequencies[currentNote-1]+df < frequency) //Actual frequency is over a reasonable value
+    servo.write(90-servoMovement);// sets the servo position according to the scaled value    
+  else
+    stringDone();  //
 }
+
 void stopServo(void){
-  servo.detach();
+  if(isServoOn){
+    servo.detach();
+    Serial.println("Servo se debio de apagar");
+    isServoOn=false;
+  }
 }
